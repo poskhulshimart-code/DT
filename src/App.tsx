@@ -78,7 +78,7 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingTask, setIsAddingTask] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'tasks' | 'stats'>('tasks');
+  const [mobileTab, setMobileTab] = useState<'tasks' | 'done' | 'upcoming' | 'stats'>('tasks');
 
   const [newTask, setNewTask] = useState<{
     title: string;
@@ -147,18 +147,25 @@ export default function App() {
   const filteredTasks = useMemo(() => {
     return tasks
       .filter(task => {
-        const matchesDate = isSameDay(new Date(task.dueDate), selectedDate);
         const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                              task.description?.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesDate && matchesSearch;
+        if (!matchesSearch) return false;
+
+        if (mobileTab === 'done') return task.completed;
+        if (mobileTab === 'upcoming') {
+          return !task.completed && isPast(startOfDay(new Date(task.dueDate))) === false && isToday(new Date(task.dueDate)) === false;
+        }
+        
+        // Default: filter by selectedDate
+        return isSameDay(new Date(task.dueDate), selectedDate);
       })
       .sort((a, b) => {
         if (a.completed !== b.completed) return a.completed ? 1 : -1;
         const pScore = { high: 3, medium: 2, low: 1 };
         if (pScore[b.priority] !== pScore[a.priority]) return pScore[b.priority] - pScore[a.priority];
-        return 0;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       });
-  }, [tasks, selectedDate, searchQuery]);
+  }, [tasks, selectedDate, searchQuery, mobileTab]);
 
   const stats = useMemo(() => {
     const total = tasks.length;
@@ -258,8 +265,41 @@ export default function App() {
         </div>
 
         <div className="flex-1 space-y-8">
+           <nav className="space-y-2">
+              <button 
+                onClick={() => setMobileTab('tasks')}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all",
+                  mobileTab === 'tasks' ? "bg-white/20 text-white font-black" : "text-white/60 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <Clock className="w-5 h-5" />
+                <span className="text-sm uppercase tracking-widest">Daily Focus</span>
+              </button>
+              <button 
+                onClick={() => setMobileTab('done')}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all",
+                  mobileTab === 'done' ? "bg-white/20 text-white font-black" : "text-white/60 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <CheckCircle className="w-5 h-5" />
+                <span className="text-sm uppercase tracking-widest">Mission History</span>
+              </button>
+              <button 
+                onClick={() => setMobileTab('upcoming')}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all",
+                  mobileTab === 'upcoming' ? "bg-white/20 text-white font-black" : "text-white/60 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <CalendarIcon className="w-5 h-5" />
+                <span className="text-sm uppercase tracking-widest">Upcoming Focus</span>
+              </button>
+           </nav>
+
            <div>
-              <h3 className="text-[10px] uppercase font-black tracking-widest text-white/40 mb-4">Focus Mode</h3>
+              <h3 className="text-[10px] uppercase font-black tracking-widest text-white/40 mb-4">Mantra</h3>
               <div className="bg-white/10 p-6 rounded-[2rem] border border-white/5">
                 <p className="text-sm font-bold text-white/80 leading-relaxed italic">
                   "The secret of getting ahead is getting started."
@@ -302,18 +342,30 @@ export default function App() {
           <div className="flex justify-between items-center">
             <div className="flex flex-col">
               <div className="flex items-baseline gap-3">
-                <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">Daily Focus</h2>
-                <span className="text-lg md:text-xl font-black text-[#6366F1] uppercase tracking-tighter opacity-40">
-                  {format(selectedDate, 'MMMM')}
-                </span>
-                <button 
-                  onClick={goToToday}
-                  className="ml-2 px-3 py-1 bg-white border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#6366F1] hover:bg-[#6366F1] hover:text-white shadow-sm transition-all active:scale-95"
-                >
-                  Today
-                </button>
+                <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">
+                  {mobileTab === 'tasks' ? 'Daily Focus' : 
+                   mobileTab === 'done' ? 'Mission History' : 
+                   mobileTab === 'upcoming' ? 'Upcoming Focus' : 'Statistics'}
+                </h2>
+                {mobileTab === 'tasks' && (
+                  <>
+                    <span className="text-lg md:text-xl font-black text-[#6366F1] uppercase tracking-tighter opacity-40">
+                      {format(selectedDate, 'MMMM')}
+                    </span>
+                    <button 
+                      onClick={goToToday}
+                      className="ml-2 px-3 py-1 bg-white border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#6366F1] hover:bg-[#6366F1] hover:text-white shadow-sm transition-all active:scale-95"
+                    >
+                      Today
+                    </button>
+                  </>
+                )}
               </div>
-              <p className="text-slate-400 font-medium text-sm">Organize your thoughts, one day at a time.</p>
+              <p className="text-slate-400 font-medium text-sm">
+                {mobileTab === 'tasks' ? 'Organize your thoughts, one day at a time.' :
+                 mobileTab === 'done' ? 'A record of your achievements.' :
+                 mobileTab === 'upcoming' ? 'Plan ahead for your next big wins.' : 'Your productivity at a glance.'}
+              </p>
             </div>
             <div className="relative group hidden md:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-[#6366F1]" />
@@ -327,9 +379,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* DATE SELECTOR SLIDER */}
-          <div className="relative group">
-            {/* Scroll Buttons */}
+          {/* DATE SELECTOR SLIDER - Only show in Tasks mode */}
+          {mobileTab === 'tasks' && (
+            <div className="relative group">
+              {/* Scroll Buttons */}
             <button 
               onClick={() => {
                 if (dateSliderRef.current) {
@@ -365,34 +418,74 @@ export default function App() {
               {dates.map((date) => {
                 const isSelected = isSameDay(date, selectedDate);
                 const isTdy = isToday(date);
+                const dateStr = format(date, 'yyyy-MM-dd');
+                const dateTasks = tasks.filter(t => t.dueDate === dateStr);
+                const hasTasks = dateTasks.length > 0;
+                const hasIncomplete = dateTasks.some(t => !t.completed);
+                const isFullyDone = hasTasks && !hasIncomplete;
+
                 return (
                   <button
                     key={date.toISOString()}
                     id={isTdy ? 'today-selector' : undefined}
                     onClick={() => setSelectedDate(date)}
                     className={cn(
-                      "shrink-0 w-16 h-20 md:w-20 md:h-24 rounded-3xl flex flex-col items-center justify-center transition-all duration-300 relative",
+                      "shrink-0 w-16 h-20 md:w-20 md:h-24 rounded-3xl flex flex-col items-center justify-center transition-all duration-300 relative border-2",
                       isSelected 
-                        ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200 scale-110 z-10" 
-                        : "bg-white text-slate-400 hover:bg-slate-50 shadow-sm"
+                        ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200 scale-110 z-10 border-[#6366F1]" 
+                        : cn(
+                            "bg-white shadow-sm",
+                            hasIncomplete 
+                              ? "border-rose-500/50 text-rose-400 hover:bg-rose-50/30" 
+                              : isFullyDone
+                                ? "border-emerald-500/50 text-emerald-400 hover:bg-emerald-50/30"
+                                : "border-transparent text-slate-400 hover:bg-slate-50"
+                          )
                     )}
                   >
-                    <span className={cn("text-[10px] font-black uppercase tracking-widest mb-1", isSelected ? "text-white/60" : "text-slate-300")}>
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-widest mb-1", 
+                      isSelected 
+                        ? "text-white/60" 
+                        : hasIncomplete 
+                          ? "text-rose-500" 
+                          : isFullyDone 
+                            ? "text-emerald-500" 
+                            : "text-slate-300"
+                    )}>
                       {format(date, 'eee')}
                     </span>
-                    <span className="text-xl md:text-2xl font-black">{format(date, 'd')}</span>
+                    <span className={cn(
+                      "text-xl md:text-2xl font-black",
+                      !isSelected && (
+                        hasIncomplete 
+                          ? "text-rose-600" 
+                          : isFullyDone 
+                            ? "text-emerald-600" 
+                            : ""
+                      )
+                    )}>
+                      {format(date, 'd')}
+                    </span>
                     {isSelected && (
                       <motion.div 
                         layoutId="active-indicator"
                         className="absolute -bottom-1 w-2 h-2 bg-[#FACC15] rounded-full shadow-lg shadow-yellow-400/50"
                       />
                     )}
+                    {!isSelected && hasIncomplete && (
+                      <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
+                    )}
+                    {!isSelected && isFullyDone && (
+                      <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                    )}
                   </button>
                 );
               })}
             </div>
           </div>
-        </header>
+        )}
+      </header>
 
         {/* TASK LIST */}
         <section className="flex-1 p-6 md:p-12 pt-0 overflow-y-auto space-y-4 pb-32 lg:pb-12">
@@ -509,6 +602,11 @@ export default function App() {
                         • <Bell className="w-3 h-3" /> {task.reminderTime}
                       </span>
                     )}
+                    {(mobileTab === 'done' || mobileTab === 'upcoming') && (
+                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">
+                        • {format(new Date(task.dueDate), 'MMM d')}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -594,15 +692,26 @@ export default function App() {
          <button 
            onClick={() => setMobileTab('tasks')}
            className={cn(
-             "flex-1 py-4 rounded-3xl flex flex-col items-center gap-1 transition-all",
+             "px-3 py-4 rounded-3xl flex flex-col items-center gap-1 transition-all",
              mobileTab === 'tasks' ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200" : "text-slate-300"
            )}
          >
             <Clock className="w-5 h-5" />
             <span className="text-[8px] font-black uppercase tracking-widest">Focus</span>
          </button>
+
+         <button 
+           onClick={() => setMobileTab('done')}
+           className={cn(
+             "px-3 py-4 rounded-3xl flex flex-col items-center gap-1 transition-all",
+             mobileTab === 'done' ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200" : "text-slate-300"
+           )}
+         >
+            <CheckCircle className="w-5 h-5" />
+            <span className="text-[8px] font-black uppercase tracking-widest">Done</span>
+         </button>
          
-         <div className="px-4">
+         <div className="px-2">
             <button 
               onClick={() => setIsAddingTask(true)}
               className="w-14 h-14 bg-[#FACC15] text-[#6366F1] rounded-2xl flex items-center justify-center shadow-xl shadow-yellow-500/20 active:scale-95 transition-transform"
@@ -612,9 +721,20 @@ export default function App() {
          </div>
 
          <button 
+           onClick={() => setMobileTab('upcoming')}
+           className={cn(
+             "px-3 py-4 rounded-3xl flex flex-col items-center gap-1 transition-all",
+             mobileTab === 'upcoming' ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200" : "text-slate-300"
+           )}
+         >
+            <CalendarIcon className="w-5 h-5" />
+            <span className="text-[8px] font-black uppercase tracking-widest">Next</span>
+         </button>
+
+         <button 
            onClick={() => setMobileTab('stats')}
            className={cn(
-             "flex-1 py-4 rounded-3xl flex flex-col items-center gap-1 transition-all",
+             "px-3 py-4 rounded-3xl flex flex-col items-center gap-1 transition-all",
              mobileTab === 'stats' ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200" : "text-slate-300"
            )}
          >
