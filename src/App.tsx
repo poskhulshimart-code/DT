@@ -111,6 +111,7 @@ export default function App() {
   const [activeReminders, setActiveReminders] = useState<Task[]>([]);
 
   const dateSliderRef = useRef<HTMLDivElement>(null);
+  const monthSliderRef = useRef<HTMLDivElement>(null);
 
   // Generate 60 days of dates for slider (30 before, 30 after today)
   const dates = useMemo(() => {
@@ -157,6 +158,14 @@ export default function App() {
       localStorage.setItem('dt_notes', JSON.stringify(dayNotes));
     }
   }, [dayNotes]);
+
+  // Center active month selector
+  useEffect(() => {
+    const activeMonthElement = document.getElementById('active-month-selector');
+    if (activeMonthElement && monthSliderRef.current) {
+      activeMonthElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [viewMonth]);
 
   // Center today on initial load
   useEffect(() => {
@@ -381,8 +390,8 @@ export default function App() {
         "flex-1 flex flex-col bg-[#F9FAFB] overflow-hidden transition-all duration-300",
         mobileTab === 'calendar' && "hidden lg:flex"
       )}>
-        {/* TOP BAR WITH SEARCH AND DATE SELECTION */}
-        <header className="p-6 md:p-12 pb-4 md:pb-6 flex flex-col gap-6 shrink-0">
+        {/* TOP BAR WITH SEARCH AND TITLE */}
+        <header className="p-6 md:p-12 pb-4 md:pb-6 flex flex-col gap-6 shrink-0 z-20">
           <div className="flex justify-between items-center">
             <div className="flex flex-col">
               <div className="flex items-baseline gap-3">
@@ -427,117 +436,116 @@ export default function App() {
               />
             </div>
           </div>
+        </header>
 
-          {/* DATE SELECTOR SLIDER - Only show in Tasks mode */}
+        {/* SCROLLABLE TASK LIST & INFO */}
+        <section className="flex-1 p-6 md:p-12 pt-0 overflow-y-auto space-y-8 pb-40 lg:pb-12 scroll-smooth no-scrollbar">
+          {/* DATE SELECTOR SLIDER - Inside scroll section */}
           {mobileTab === 'tasks' && (
-            <div className="relative group">
+            <div className="relative group mb-4">
               {/* Scroll Buttons */}
-            <button 
-              onClick={() => {
-                if (dateSliderRef.current) {
-                  dateSliderRef.current.scrollBy({ left: -300, behavior: 'smooth' });
-                }
-              }}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-10 h-10 bg-white shadow-xl rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 hover:scale-110 border border-slate-100"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
+              <button 
+                onClick={() => {
+                  if (dateSliderRef.current) {
+                    dateSliderRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+                  }
+                }}
+                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-10 h-10 bg-white shadow-xl rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 hover:scale-110 border border-slate-100"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
 
-            <button 
-              onClick={() => {
-                if (dateSliderRef.current) {
-                  dateSliderRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-                }
-              }}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-10 h-10 bg-white shadow-xl rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 hover:scale-110 border border-slate-100"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
+              <button 
+                onClick={() => {
+                  if (dateSliderRef.current) {
+                    dateSliderRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+                  }
+                }}
+                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-10 h-10 bg-white shadow-xl rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 hover:scale-110 border border-slate-100"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
 
-            <div 
-              ref={dateSliderRef}
-              className="flex gap-3 overflow-x-auto pb-4 pt-2 scroll-smooth no-scrollbar"
-              style={{ 
-                scrollbarWidth: 'none', 
-                msOverflowStyle: 'none',
-                WebkitOverflowScrolling: 'touch',
-                maskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)'
-              }}
-            >
-              {dates.map((date) => {
-                const isSelected = isSameDay(date, selectedDate);
-                const isTdy = isToday(date);
-                const dateStr = format(date, 'yyyy-MM-dd');
-                const dateTasks = tasks.filter(t => t.dueDate === dateStr);
-                const hasTasks = dateTasks.length > 0;
-                const hasIncomplete = dateTasks.some(t => !t.completed);
-                const isFullyDone = hasTasks && !hasIncomplete;
+              <div 
+                ref={dateSliderRef}
+                className="flex gap-3 overflow-x-auto pb-6 pt-2 scroll-smooth no-scrollbar"
+                style={{ 
+                  scrollbarWidth: 'none', 
+                  msOverflowStyle: 'none',
+                  WebkitOverflowScrolling: 'touch',
+                  maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)'
+                }}
+              >
+                {dates.map((date) => {
+                  const isSelected = isSameDay(date, selectedDate);
+                  const isTdy = isToday(date);
+                  const dateStr = format(date, 'yyyy-MM-dd');
+                  const dateTasks = tasks.filter(t => t.dueDate === dateStr);
+                  const hasTasks = dateTasks.length > 0;
+                  const hasIncomplete = dateTasks.some(t => !t.completed);
+                  const isFullyDone = hasTasks && !hasIncomplete;
 
-                return (
-                  <button
-                    key={date.toISOString()}
-                    id={isTdy ? 'today-selector' : undefined}
-                    onClick={() => setSelectedDate(date)}
-                    className={cn(
-                      "shrink-0 w-16 h-20 md:w-20 md:h-24 rounded-3xl flex flex-col items-center justify-center transition-all duration-300 relative border-2",
-                      isSelected 
-                        ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200 scale-110 z-10 border-[#6366F1]" 
-                        : cn(
-                            "bg-white shadow-sm",
-                            hasIncomplete 
-                              ? "border-rose-500/50 text-rose-400 hover:bg-rose-50/30" 
-                              : isFullyDone
-                                ? "border-emerald-500/50 text-emerald-400 hover:bg-emerald-50/30"
-                                : "border-transparent text-slate-400 hover:bg-slate-50"
-                          )
-                    )}
-                  >
-                    <span className={cn(
-                      "text-[10px] font-black uppercase tracking-widest mb-1", 
-                      isSelected 
-                        ? "text-white/60" 
-                        : hasIncomplete 
-                          ? "text-rose-500" 
-                          : isFullyDone 
-                            ? "text-emerald-500" 
-                            : "text-slate-300"
-                    )}>
-                      {format(date, 'eee')}
-                    </span>
-                    <span className={cn(
-                      "text-xl md:text-2xl font-black",
-                      !isSelected && (
-                        hasIncomplete 
-                          ? "text-rose-600" 
-                          : isFullyDone 
-                            ? "text-emerald-600" 
-                            : ""
-                      )
-                    )}>
-                      {format(date, 'd')}
-                    </span>
-                    {isSelected && (
-                      <motion.div 
-                        layoutId="active-indicator"
-                        className="absolute -bottom-1 w-2 h-2 bg-[#FACC15] rounded-full shadow-lg shadow-yellow-400/50"
-                      />
-                    )}
-                    {!isSelected && hasIncomplete && (
-                      <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
-                    )}
-                    {!isSelected && isFullyDone && (
-                      <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                    )}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={date.toISOString()}
+                      id={isTdy ? 'today-selector' : undefined}
+                      onClick={() => setSelectedDate(date)}
+                      className={cn(
+                        "shrink-0 w-16 h-20 md:w-20 md:h-24 rounded-3xl flex flex-col items-center justify-center transition-all duration-300 relative border-2",
+                        isSelected 
+                          ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200 scale-110 z-10 border-[#6366F1]" 
+                          : cn(
+                              "bg-white shadow-sm",
+                              hasIncomplete 
+                                ? "border-rose-500/50 text-rose-400 hover:bg-rose-50/30" 
+                                : isFullyDone
+                                  ? "border-emerald-500/50 text-emerald-400 hover:bg-emerald-50/30"
+                                  : "border-transparent text-slate-400 hover:bg-slate-50"
+                            )
+                      )}
+                    >
+                      <span className={cn(
+                        "text-[10px] font-black uppercase tracking-widest mb-1", 
+                        isSelected 
+                          ? "text-white/60" 
+                          : hasIncomplete 
+                            ? "text-rose-500" 
+                            : isFullyDone 
+                              ? "text-emerald-500" 
+                              : "text-slate-300"
+                      )}>
+                        {format(date, 'eee')}
+                      </span>
+                      <span className={cn(
+                        "text-xl md:text-2xl font-black",
+                        !isSelected && (
+                          hasIncomplete 
+                            ? "text-rose-600" 
+                            : isFullyDone 
+                              ? "text-emerald-600" 
+                              : ""
+                        )
+                      )}>
+                        {format(date, 'd')}
+                      </span>
+                      {isSelected && (
+                        <motion.div 
+                          layoutId="active-indicator"
+                          className="absolute -bottom-1 w-2 h-2 bg-[#FACC15] rounded-full shadow-lg shadow-yellow-400/50"
+                        />
+                      )}
+                      {!isSelected && hasIncomplete && (
+                        <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
+                      )}
+                      {!isSelected && isFullyDone && (
+                        <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
-      </header>
-
-        {/* TASK LIST */}
-        <section className="flex-1 p-6 md:p-12 pt-0 overflow-y-auto space-y-4 pb-32 lg:pb-12">
+          )}
           <AnimatePresence>
             {isAddingTask && (
               <motion.div 
@@ -720,6 +728,19 @@ export default function App() {
               </div>
             )}
           </AnimatePresence>
+
+          {/* DAY NOTES - Also visible in Task Focus View */}
+          <div className="mt-12 pt-12 border-t-2 border-slate-100/50 space-y-6">
+            <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <Lightbulb className="w-3 h-3 text-[#FACC15]" /> Daily Reflection & Notes
+            </h3>
+            <textarea 
+              value={dayNotes[format(selectedDate, 'yyyy-MM-dd')] || ''}
+              onChange={(e) => setDayNotes({...dayNotes, [format(selectedDate, 'yyyy-MM-dd')]: e.target.value})}
+              placeholder={`Write down thoughts for ${format(selectedDate, 'MMMM d')}...`}
+              className="w-full min-h-[150px] bg-white border-2 border-slate-100 rounded-[2.5rem] p-8 text-sm font-bold text-slate-600 placeholder:text-slate-300 focus:border-[#FACC15] outline-none transition-all resize-none shadow-sm"
+            />
+          </div>
         </section>
       </main>
 
@@ -728,46 +749,77 @@ export default function App() {
         "lg:flex w-full lg:w-[450px] bg-white flex-col border-l lg:border-slate-50 overflow-hidden shrink-0",
         mobileTab !== 'calendar' && "hidden lg:flex"
       )}>
-        <div className="p-8 md:p-10 pb-0 w-full flex flex-col gap-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-               <CalendarIcon className="w-8 h-8 text-[#6366F1]" />
-               Calendar
-            </h2>
-            <button 
-              onClick={goToToday}
-              className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#6366F1] hover:bg-[#6366F1] hover:text-white shadow-sm transition-all shadow-inner"
-            >
-              Today
-            </button>
-          </div>
-
-          {/* MONTH SELECTOR */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-            {eachMonthOfInterval({
-              start: startOfYear(new Date(2026, 0, 1)),
-              end: endOfYear(new Date(2026, 0, 1))
-            }).map((m) => {
-              const isCurrent = isSameDay(startOfMonth(m), viewMonth);
-              return (
-                <button
-                  key={m.toISOString()}
-                  onClick={() => setViewMonth(startOfMonth(m))}
-                  className={cn(
-                    "shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                    isCurrent ? "bg-[#6366F1] text-white shadow-lg shadow-indigo-100" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-                  )}
-                >
-                  {format(m, 'MMM')}
-                </button>
-              );
-            })}
-          </div>
+        <div className="p-8 md:p-10 pb-0 w-full flex items-center justify-between shrink-0">
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+             <CalendarIcon className="w-8 h-8 text-[#6366F1]" />
+             Calendar
+          </h2>
+          <button 
+            onClick={goToToday}
+            className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#6366F1] hover:bg-[#6366F1] hover:text-white shadow-sm transition-all shadow-inner"
+          >
+            Today
+          </button>
         </div>
 
-        {/* CALENDAR CONTENT */}
+        {/* CALENDAR SCROLL AREA */}
         <div className="flex-1 overflow-y-auto p-8 md:p-10 pt-6 space-y-12 scroll-smooth no-scrollbar">
-             <div className="space-y-6">
+          {/* MONTH SELECTOR - Now inside scroll area */}
+          <div className="relative group mb-4">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (monthSliderRef.current) {
+                  monthSliderRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+                }
+              }}
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-8 h-8 bg-white shadow-lg rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 border border-slate-100"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (monthSliderRef.current) {
+                  monthSliderRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+                }
+              }}
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-8 h-8 bg-white shadow-lg rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 border border-slate-100"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            <div 
+              ref={monthSliderRef}
+              className="flex gap-2 overflow-x-auto no-scrollbar pb-6 scroll-smooth"
+              style={{ 
+                maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)'
+              }}
+            >
+              {eachMonthOfInterval({
+                start: startOfYear(new Date(2026, 0, 1)),
+                end: endOfYear(new Date(2026, 0, 1))
+              }).map((m) => {
+                const isCurrent = isSameDay(startOfMonth(m), viewMonth);
+                return (
+                  <button
+                    key={m.toISOString()}
+                    id={isCurrent ? 'active-month-selector' : undefined}
+                    onClick={() => setViewMonth(startOfMonth(m))}
+                    className={cn(
+                      "shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                      isCurrent ? "bg-[#6366F1] text-white shadow-lg shadow-indigo-100" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                    )}
+                  >
+                    {format(m, 'MMM')}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          
+          <div className="space-y-6">
                 <h3 className="font-black text-[#6366F1] uppercase tracking-widest text-sm px-2 flex justify-between items-center">
                   {format(viewMonth, 'MMMM yyyy')}
                 </h3>
