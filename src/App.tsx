@@ -13,7 +13,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
-  X
+  X,
+  ArrowUpDown,
+  SortAsc,
+  SortDesc
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -37,6 +40,13 @@ import { cn } from './lib/utils';
 // --- Types ---
 
 type Priority = 'low' | 'medium' | 'high';
+type SortField = 'priority' | 'dueDate' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfig {
+  field: SortField;
+  direction: SortDirection;
+}
 
 interface Task {
   id: string;
@@ -85,6 +95,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [mobileTab, setMobileTab] = useState<'tasks' | 'done' | 'upcoming' | 'calendar'>('tasks');
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'priority', direction: 'desc' });
   const [dayNotes, setDayNotes] = useState<{[key: string]: string}>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dt_notes');
@@ -191,12 +202,31 @@ export default function App() {
         return isSameDay(new Date(task.dueDate), selectedDate);
       })
       .sort((a, b) => {
+        const direction = sortConfig.direction === 'asc' ? 1 : -1;
+        
         if (a.completed !== b.completed) return a.completed ? 1 : -1;
+
+        if (sortConfig.field === 'priority') {
+          const pScore = { high: 3, medium: 2, low: 1 };
+          if (pScore[a.priority] !== pScore[b.priority]) {
+            return (pScore[a.priority] - pScore[b.priority]) * direction;
+          }
+        } else if (sortConfig.field === 'dueDate') {
+          const dateA = new Date(a.dueDate).getTime();
+          const dateB = new Date(b.dueDate).getTime();
+          if (dateA !== dateB) return (dateA - dateB) * direction;
+        } else if (sortConfig.field === 'createdAt') {
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          if (dateA !== dateB) return (dateA - dateB) * direction;
+        }
+
+        // Fallback to secondary sorts for stability
         const pScore = { high: 3, medium: 2, low: 1 };
         if (pScore[b.priority] !== pScore[a.priority]) return pScore[b.priority] - pScore[a.priority];
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       });
-  }, [tasks, selectedDate, searchQuery, mobileTab]);
+  }, [tasks, selectedDate, searchQuery, mobileTab, sortConfig]);
 
   const addTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -244,7 +274,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen bg-[#FDFCF0] font-sans text-[#2D3436] selection:bg-[#FACC15] selection:text-[#6366F1] overflow-hidden relative">
+    <div className="flex flex-col lg:flex-row h-[100dvh] bg-[#FDFCF0] font-sans text-[#2D3436] selection:bg-[#FACC15] selection:text-[#6366F1] overflow-hidden relative">
       {/* REMINDER TOASTS */}
       <div className="fixed top-4 right-4 left-4 md:left-auto md:w-96 z-[100] space-y-3">
         <AnimatePresence>
@@ -436,10 +466,43 @@ export default function App() {
               />
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-4 mt-2">
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sort:</span>
+            </div>
+            
+            <div className="flex bg-white p-1 rounded-xl border border-slate-100 shadow-sm">
+              {(['priority', 'dueDate', 'createdAt'] as SortField[]).map((field) => (
+                <button
+                  key={field}
+                  onClick={() => setSortConfig(prev => ({ 
+                    field, 
+                    direction: prev.field === field ? (prev.direction === 'asc' ? 'desc' : 'asc') : 'desc' 
+                  }))}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    sortConfig.field === field ? "bg-[#6366F1] text-white shadow-sm" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  {field === 'priority' ? 'Priority' : field === 'dueDate' ? 'Date' : 'Created'}
+                </button>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => setSortConfig(prev => ({ ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' }))}
+              className="px-3 py-1.5 bg-white rounded-xl border border-slate-100 shadow-sm text-[#6366F1] hover:bg-slate-50 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+            >
+              {sortConfig.direction === 'asc' ? <SortAsc className="w-3.5 h-3.5" /> : <SortDesc className="w-3.5 h-3.5" />}
+              {sortConfig.direction === 'asc' ? 'ASC' : 'DESC'}
+            </button>
+          </div>
         </header>
 
         {/* SCROLLABLE TASK LIST & INFO */}
-        <section className="flex-1 p-6 md:p-12 pt-0 overflow-y-auto space-y-8 pb-40 lg:pb-12 scroll-smooth no-scrollbar">
+        <section className="flex-1 p-6 md:p-12 pt-0 overflow-y-auto space-y-8 pb-48 lg:pb-12 scroll-smooth min-h-0">
           {/* DATE SELECTOR SLIDER - Inside scroll section */}
           {mobileTab === 'tasks' && (
             <div className="relative group mb-4">
@@ -746,7 +809,7 @@ export default function App() {
 
       {/* CALENDAR SECTION (Desktop Aside / Mobile Tab) */}
       <aside className={cn(
-        "lg:flex w-full lg:w-[450px] bg-white flex-col border-l lg:border-slate-50 overflow-hidden shrink-0",
+        "lg:flex w-full lg:w-[450px] bg-white flex-col border-l lg:border-slate-50 overflow-hidden shrink-0 flex-1 lg:flex-none h-full min-h-0",
         mobileTab !== 'calendar' && "hidden lg:flex"
       )}>
         <div className="p-8 md:p-10 pb-0 w-full flex items-center justify-between shrink-0">
@@ -763,7 +826,7 @@ export default function App() {
         </div>
 
         {/* CALENDAR SCROLL AREA */}
-        <div className="flex-1 overflow-y-auto p-8 md:p-10 pt-6 space-y-12 scroll-smooth no-scrollbar">
+        <div className="flex-1 overflow-y-auto p-8 md:p-10 pt-6 space-y-12 scroll-smooth min-h-0">
           {/* MONTH SELECTOR - Now inside scroll area */}
           <div className="relative group mb-4">
             <button 
@@ -905,7 +968,7 @@ export default function App() {
                 </div>
               )}
 
-              <div className="flex flex-col gap-4 pb-20 lg:pb-0">
+              <div className="flex flex-col gap-4 pb-48 lg:pb-0">
                  <h5 className="text-[10px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
                    <Lightbulb className="w-3 h-3 text-[#FACC15]" /> Today's Notes
                  </h5>
