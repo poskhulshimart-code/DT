@@ -25,7 +25,12 @@ import {
   eachDayOfInterval, 
   isSameDay, 
   startOfToday,
-  startOfDay
+  startOfDay,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  eachMonthOfInterval
 } from 'date-fns';
 import { cn } from './lib/utils';
 
@@ -42,6 +47,7 @@ interface Task {
   priority: Priority;
   completed: boolean;
   createdAt: string;
+  completedAt?: string;
 }
 
 // --- Mock Data ---
@@ -78,7 +84,14 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingTask, setIsAddingTask] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'tasks' | 'done' | 'upcoming' | 'stats'>('tasks');
+  const [mobileTab, setMobileTab] = useState<'tasks' | 'done' | 'upcoming' | 'calendar'>('tasks');
+  const [dayNotes, setDayNotes] = useState<{[key: string]: string}>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dt_notes');
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
+  });
 
   const [newTask, setNewTask] = useState<{
     title: string;
@@ -91,6 +104,8 @@ export default function App() {
     priority: 'medium',
     reminderTime: '',
   });
+
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const [activeReminders, setActiveReminders] = useState<Task[]>([]);
 
@@ -136,6 +151,12 @@ export default function App() {
     }
   }, [tasks]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dt_notes', JSON.stringify(dayNotes));
+    }
+  }, [dayNotes]);
+
   // Center today on initial load
   useEffect(() => {
     const todayElement = document.getElementById('today-selector');
@@ -167,14 +188,6 @@ export default function App() {
       });
   }, [tasks, selectedDate, searchQuery, mobileTab]);
 
-  const stats = useMemo(() => {
-    const total = tasks.length;
-    const completed = tasks.filter(t => t.completed).length;
-    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-    const overdue = tasks.filter(t => !t.completed && isPast(startOfDay(new Date(t.dueDate))) && !isToday(new Date(t.dueDate))).length;
-    return { total, completed, percentage, overdue };
-  }, [tasks]);
-
   const addTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTask.title.trim()) return;
@@ -192,7 +205,17 @@ export default function App() {
   };
 
   const toggleTask = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+    setTasks(prev => prev.map(t => {
+      if (t.id === id) {
+        const isNowCompleted = !t.completed;
+        return { 
+          ...t, 
+          completed: isNowCompleted,
+          completedAt: isNowCompleted ? new Date().toISOString() : undefined
+        };
+      }
+      return t;
+    }));
     setActiveReminders(prev => prev.filter(r => r.id !== id));
   };
   const deleteTask = (id: string) => {
@@ -249,11 +272,41 @@ export default function App() {
           <h1 className="text-xl font-black tracking-tighter italic">DT.</h1>
         </div>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center font-black text-white text-[10px]">
-             {percentageBadge(stats.percentage)}
+          <button 
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+          <div className="px-3 py-1 bg-white/20 rounded-xl flex items-center justify-center font-black text-white text-[10px] uppercase tracking-widest">
+             {format(selectedDate, 'MMM d')}
           </div>
         </div>
       </header>
+
+      {/* MOBILE SEARCH OVERLAY */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="lg:hidden bg-[#6366F1] px-4 pb-4 z-20 overflow-hidden"
+          >
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+              <input 
+                type="text" 
+                autoFocus
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white/10 border-2 border-white/5 rounded-2xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/40 outline-none focus:border-white/20 transition-all"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden lg:flex w-72 bg-[#6366F1] p-8 flex-col text-white shrink-0">
@@ -284,40 +337,29 @@ export default function App() {
                 )}
               >
                 <CheckCircle className="w-5 h-5" />
-                <span className="text-sm uppercase tracking-widest">Mission History</span>
+                <span className="text-sm uppercase tracking-widest">Done Tasks</span>
               </button>
               <button 
-                onClick={() => setMobileTab('upcoming')}
+                onClick={() => setMobileTab('calendar')}
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all",
-                  mobileTab === 'upcoming' ? "bg-white/20 text-white font-black" : "text-white/60 hover:text-white hover:bg-white/10"
+                  mobileTab === 'calendar' ? "bg-white/20 text-white font-black" : "text-white/60 hover:text-white hover:bg-white/10"
                 )}
               >
                 <CalendarIcon className="w-5 h-5" />
-                <span className="text-sm uppercase tracking-widest">Upcoming Focus</span>
+                <span className="text-sm uppercase tracking-widest">Calendar</span>
               </button>
            </nav>
 
            <div>
               <h3 className="text-[10px] uppercase font-black tracking-widest text-white/40 mb-4">Mantra</h3>
-              <div className="bg-white/10 p-6 rounded-[2rem] border border-white/5">
-                <p className="text-sm font-bold text-white/80 leading-relaxed italic">
-                  "The secret of getting ahead is getting started."
+              <div className="bg-white/10 p-6 rounded-[2rem] border border-white/5 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+                   <Lightbulb className="w-12 h-12 text-white" />
+                </div>
+                <p className="text-sm font-bold text-white/80 leading-relaxed italic relative z-10">
+                   "Success is the sum of small efforts repeated day in and day out."
                 </p>
-              </div>
-           </div>
-
-           <div className="space-y-4">
-              <div className="flex justify-between items-end">
-                <span className="text-[10px] uppercase font-black tracking-widest text-white/40">Total Efficiency</span>
-                <span className="text-2xl font-black text-[#FACC15]">{stats.percentage}%</span>
-              </div>
-              <div className="h-3 bg-white/10 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${stats.percentage}%` }}
-                  className="h-full bg-[#FACC15]"
-                />
               </div>
            </div>
         </div>
@@ -335,7 +377,7 @@ export default function App() {
       {/* MAIN CONTENT */}
       <main className={cn(
         "flex-1 flex flex-col bg-[#F9FAFB] overflow-hidden transition-all duration-300",
-        mobileTab !== 'tasks' && "hidden lg:flex"
+        mobileTab === 'calendar' && "hidden lg:flex"
       )}>
         {/* TOP BAR WITH SEARCH AND DATE SELECTION */}
         <header className="p-6 md:p-12 pb-4 md:pb-6 flex flex-col gap-6 shrink-0">
@@ -344,8 +386,8 @@ export default function App() {
               <div className="flex items-baseline gap-3">
                 <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">
                   {mobileTab === 'tasks' ? 'Daily Focus' : 
-                   mobileTab === 'done' ? 'Mission History' : 
-                   mobileTab === 'upcoming' ? 'Upcoming Focus' : 'Statistics'}
+                   mobileTab === 'done' ? 'Done Tasks' : 
+                   mobileTab === 'upcoming' ? 'Upcoming' : 'Calendar'}
                 </h2>
                 {mobileTab === 'tasks' && (
                   <>
@@ -358,6 +400,11 @@ export default function App() {
                     >
                       Today
                     </button>
+                    {BANGLADESH_HOLIDAYS[format(selectedDate, 'yyyy-MM-dd')] && (
+                      <span className="ml-2 px-3 py-1 bg-rose-50 border border-rose-100 rounded-xl text-[8px] font-black uppercase tracking-widest text-rose-600 animate-pulse">
+                         Public Holiday
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -492,64 +539,89 @@ export default function App() {
           <AnimatePresence>
             {isAddingTask && (
               <motion.div 
-                initial={{ opacity: 0, y: -20 }}
+                initial={{ opacity: 0, y: 100 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="bg-white p-6 md:p-8 rounded-[2rem] shadow-xl border-4 border-[#6366F1] mb-6"
+                exit={{ opacity: 0, y: 100 }}
+                className={cn(
+                  "fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-6 bg-slate-900/60 backdrop-blur-sm lg:relative lg:inset-auto lg:z-0 lg:p-0 lg:bg-transparent lg:backdrop-blur-none"
+                )}
               >
-                <form onSubmit={addTask} className="space-y-4">
-                  <input 
-                    autoFocus
-                    placeholder="What needs doing today?"
-                    value={newTask.title}
-                    onChange={(e) => setNewTask({...newTask, title: e.target.value})}
-                    className="w-full text-xl md:text-2xl font-black border-none focus:ring-0 p-0 text-slate-900 placeholder:text-slate-200 bg-transparent"
-                  />
-                  <input 
-                    placeholder="Add details (optional)..."
-                    value={newTask.description}
-                    onChange={(e) => setNewTask({...newTask, description: e.target.value})}
-                    className="w-full text-sm font-medium border-none focus:ring-0 p-0 text-slate-400 placeholder:text-slate-200 bg-transparent"
-                  />
-                  <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 pt-4 border-t border-slate-50">
-                    <div className="flex flex-wrap items-center gap-4">
-                       <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black uppercase text-slate-300 tracking-widest">Priority:</span>
-                          <div className="flex bg-slate-50 p-1 rounded-xl gap-1">
-                             {(['low', 'medium', 'high'] as Priority[]).map(p => (
-                               <button
-                                 key={p}
-                                 type="button"
-                                 onClick={() => setNewTask({...newTask, priority: p})}
-                                 className={cn(
-                                   "px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all",
-                                   newTask.priority === p 
-                                     ? p === 'high' ? "bg-rose-500 text-white" : p === 'medium' ? "bg-amber-500 text-white" : "bg-blue-500 text-white"
-                                     : "text-slate-400 hover:text-slate-600"
-                                 )}
-                               >
-                                 {p}
-                               </button>
-                             ))}
-                          </div>
-                       </div>
-                       
-                       <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black uppercase text-slate-300 tracking-widest">Reminder:</span>
-                          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                             <Bell className="w-3.5 h-3.5 text-slate-400" />
-                             <input 
-                               type="time" 
-                               value={newTask.reminderTime}
-                               onChange={(e) => setNewTask({...newTask, reminderTime: e.target.value})}
-                               className="bg-transparent border-none focus:ring-0 p-0 text-[10px] font-black uppercase text-slate-600 w-20"
-                             />
-                          </div>
-                       </div>
+                {/* Click outside to close for mobile overlay */}
+                <div className="absolute inset-0 lg:hidden" onClick={() => setIsAddingTask(false)} />
+                
+                <form 
+                  onSubmit={addTask}
+                  className="bg-white w-full lg:w-auto lg:flex-1 p-8 md:p-10 rounded-t-[3rem] md:rounded-[3rem] border-x md:border-2 border-t md:border-slate-100 shadow-2xl lg:shadow-none relative z-10 max-h-[90vh] overflow-y-auto"
+                >
+                  <div className="flex justify-between items-center mb-8">
+                     <h2 className="text-xl font-black text-slate-900 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-[#FACC15] rounded-2xl flex items-center justify-center">
+                           <Plus className="w-6 h-6 text-[#6366F1]" />
+                        </div>
+                        Set New Focus
+                     </h2>
+                     <button type="button" onClick={() => setIsAddingTask(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                        <X className="w-6 h-6 text-slate-400" />
+                     </button>
+                  </div>
+                  
+                  <div className="space-y-8">
+                    <div className="space-y-4">
+                      <input 
+                        type="text" 
+                        autoFocus
+                        placeholder="What's your priority?"
+                        value={newTask.title}
+                        onChange={(e) => setNewTask({...newTask, title: e.target.value})}
+                        className="w-full text-2xl font-black text-slate-900 placeholder:text-slate-200 outline-none border-b-4 border-slate-50 focus:border-[#6366F1] pb-2 transition-all bg-transparent"
+                      />
+                      <textarea 
+                        placeholder="Add some details..."
+                        value={newTask.description}
+                        onChange={(e) => setNewTask({...newTask, description: e.target.value})}
+                        className="w-full text-sm font-bold text-slate-500 placeholder:text-slate-200 outline-none border-none resize-none h-20 bg-transparent"
+                      />
                     </div>
-                    <div className="flex items-center gap-2">
-                       <button type="button" onClick={() => setIsAddingTask(false)} className="px-6 py-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">Discard</button>
-                       <button type="submit" className="bg-[#6366F1] text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100">Add to {format(selectedDate, 'MMM d')}</button>
+
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div className="flex items-center gap-4">
+                           <span className="text-[10px] font-black uppercase text-slate-300 tracking-widest">Priority:</span>
+                           <div className="flex gap-2">
+                              {(['low', 'medium', 'high'] as Priority[]).map((p) => (
+                                <button 
+                                  key={p}
+                                  type="button"
+                                  onClick={() => setNewTask({...newTask, priority: p})}
+                                  className={cn(
+                                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-2",
+                                    newTask.priority === p 
+                                      ? p === 'high' ? "bg-rose-500 text-white border-rose-500 shadow-lg shadow-rose-100" : p === 'medium' ? "bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-100" : "bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-100"
+                                      : "text-slate-400 hover:text-slate-600 border-slate-50 bg-slate-50"
+                                  )}
+                                >
+                                  {p}
+                                </button>
+                              ))}
+                           </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                           <span className="text-[10px] font-black uppercase text-slate-300 tracking-widest">Reminder:</span>
+                           <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl border-2 border-slate-100">
+                              <Bell className="w-4 h-4 text-slate-400" />
+                              <input 
+                                type="time" 
+                                value={newTask.reminderTime}
+                                onChange={(e) => setNewTask({...newTask, reminderTime: e.target.value})}
+                                className="bg-transparent border-none focus:ring-0 p-0 text-xs font-black uppercase text-slate-600 w-24"
+                              />
+                           </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 pt-4 border-t border-slate-50">
+                       <button type="button" onClick={() => setIsAddingTask(false)} className="px-6 py-4 flex-1 text-[10px] font-black uppercase text-slate-400 tracking-widest hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
+                       <button type="submit" className="bg-[#6366F1] text-white px-8 py-4 flex-[2] rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:scale-[1.02] active:scale-95 transition-all">Add Focus</button>
                     </div>
                   </div>
                 </form>
@@ -589,6 +661,12 @@ export default function App() {
                     )}>
                       {task.priority} Focus
                     </span>
+                    <span className={cn(
+                      "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest leading-none px-2 py-1 rounded-lg",
+                      task.completed ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
+                    )}>
+                      {task.completed ? "Done" : "Pending"}
+                    </span>
                     {task.description && (
                       <span className="text-[10px] text-slate-300 font-bold max-w-[200px] truncate">
                         • {task.description}
@@ -602,9 +680,14 @@ export default function App() {
                         • <Bell className="w-3 h-3" /> {task.reminderTime}
                       </span>
                     )}
-                    {(mobileTab === 'done' || mobileTab === 'upcoming') && (
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">
-                        • {format(new Date(task.dueDate), 'MMM d')}
+                    {mobileTab === 'done' && task.completedAt && (
+                      <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">
+                        • Done {format(new Date(task.completedAt), 'MMM d, h:mm a')}
+                      </span>
+                    )}
+                    {mobileTab === 'upcoming' && (
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                        • Due {format(new Date(task.dueDate), 'MMM d')} {task.reminderTime ? `@ ${task.reminderTime}` : ''}
                       </span>
                     )}
                   </div>
@@ -638,52 +721,127 @@ export default function App() {
         </section>
       </main>
 
-      {/* STATS SECTION (Desktop Aside / Mobile Tab) */}
+      {/* CALENDAR SECTION (Desktop Aside / Mobile Tab) */}
       <aside className={cn(
-        "lg:flex w-full lg:w-80 bg-white p-8 md:p-10 flex-col items-center border-l lg:border-slate-50 overflow-y-auto shrink-0",
-        mobileTab !== 'stats' && "hidden lg:flex"
+        "lg:flex w-full lg:w-[450px] bg-white flex-col border-l lg:border-slate-50 overflow-hidden shrink-0",
+        mobileTab !== 'calendar' && "hidden lg:flex"
       )}>
-        <h2 className="lg:hidden text-2xl font-black text-slate-900 mb-10 w-full">Statistics</h2>
-        <div className="relative w-48 h-48 mb-12 group">
-          <svg className="w-full h-full transform -rotate-90">
-            <circle cx="96" cy="96" r="84" stroke="#F8FAFC" strokeWidth="18" fill="transparent" />
-            <motion.circle 
-              cx="96" cy="96" r="84" stroke="#6366F1" strokeWidth="18" fill="transparent"
-              strokeDasharray="527.7"
-              initial={{ strokeDashoffset: 527.7 }}
-              animate={{ strokeDashoffset: 527.7 - (527.7 * stats.percentage) / 100 }}
-              strokeLinecap="round"
-              className="transition-all duration-1000 ease-out"
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-5xl font-black text-slate-900 tracking-tighter">{stats.percentage}%</span>
-            <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Efficiency</span>
-          </div>
+        <div className="p-8 md:p-10 pb-0 w-full flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+             <CalendarIcon className="w-8 h-8 text-[#6366F1]" />
+             Calendar
+          </h2>
+          <button 
+            onClick={goToToday}
+            className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#6366F1] hover:bg-[#6366F1] hover:text-white shadow-sm transition-all shadow-inner"
+          >
+            Today
+          </button>
         </div>
 
-        <div className="w-full space-y-10">
-          <div className="grid grid-cols-2 gap-4">
-             <div className="bg-emerald-50/50 p-6 rounded-[2rem] border border-emerald-100 text-center">
-                <span className="text-3xl font-black text-emerald-600 block mb-1">{stats.completed}</span>
-                <span className="text-[10px] uppercase font-black text-emerald-700 tracking-widest">Done</span>
-             </div>
-             <div className="bg-rose-50/50 p-6 rounded-[2rem] border border-rose-100 text-center">
-                <span className="text-3xl font-black text-rose-600 block mb-1">{stats.overdue}</span>
-                <span className="text-[10px] uppercase font-black text-rose-700 tracking-widest">Lapsed</span>
-             </div>
-          </div>
+        {/* SCROLLABLE CALENDAR LIST */}
+        <div className="flex-1 overflow-y-auto p-8 md:p-10 pt-6 space-y-12 scroll-smooth no-scrollbar">
+           {eachMonthOfInterval({
+             start: startOfYear(new Date(2026, 0, 1)),
+             end: endOfYear(new Date(2026, 0, 1))
+           }).map((month) => (
+             <div key={month.toISOString()} className="space-y-6">
+                <h3 className="font-black text-[#6366F1] uppercase tracking-widest text-sm px-2 flex justify-between items-center">
+                  {format(month, 'MMMM yyyy')}
+                  <span className="text-[10px] text-slate-300 font-bold">{format(month, 'MMM')}</span>
+                </h3>
 
-          <div>
-            <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Lightbulb className="w-3 h-3 text-[#FACC15]" /> Daily Insight
-            </h4>
-            <div className="bg-[#FDFCF0] p-6 rounded-[2rem] border-2 border-[#FACC15] shadow-sm">
-              <p className="text-sm leading-relaxed font-bold text-slate-600 italic">
-                "{getInsight(stats.percentage)}"
-              </p>
-            </div>
-          </div>
+                <div className="grid grid-cols-7 gap-2">
+                   {['S','M','T','W','T','F','S'].map((d, i) => (
+                     <span key={i} className="text-[10px] font-black text-slate-200 text-center uppercase mb-2">{d}</span>
+                   ))}
+                   
+                   {/* Spacing for start of month */}
+                   {Array.from({length: parseInt(format(startOfMonth(month), 'i')) % 7}).map((_, i) => (
+                     <div key={`empty-${i}`} />
+                   ))}
+
+                   {eachDayOfInterval({
+                     start: startOfMonth(month),
+                     end: endOfMonth(month)
+                   }).map((day) => {
+                      const dateKey = format(day, 'yyyy-MM-dd');
+                      const isSelected = isSameDay(day, selectedDate);
+                      const holiday = BANGLADESH_HOLIDAYS[dateKey];
+                      const isTodayDate = isToday(day);
+
+                      return (
+                        <button 
+                          key={day.toISOString()}
+                          onClick={() => setSelectedDate(day)}
+                          className={cn(
+                            "aspect-square rounded-2xl flex flex-col items-center justify-center relative transition-all group",
+                            isSelected ? "bg-[#6366F1] text-white shadow-lg shadow-indigo-200 scale-110 z-10" : "bg-slate-50/50 border border-transparent hover:border-indigo-100 hover:bg-indigo-50/30",
+                            holiday && !isSelected && "bg-rose-50 border-rose-200",
+                            isTodayDate && !isSelected && "ring-2 ring-[#FACC15] ring-offset-2"
+                          )}
+                        >
+                           <span className={cn(
+                             "text-xs font-black",
+                             holiday && !isSelected ? "text-rose-600" : "text-slate-600",
+                             isSelected && "text-white"
+                           )}>
+                             {format(day, 'd')}
+                           </span>
+                           {holiday && (
+                             <div className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 border-2 border-white rounded-full shadow-sm" />
+                           )}
+                           {dayNotes[dateKey] && !isSelected && (
+                             <div className="absolute -bottom-1 w-1.5 h-1.5 bg-[#FACC15] rounded-full" />
+                           )}
+                        </button>
+                      );
+                   })}
+                </div>
+             </div>
+           ))}
+
+           {/* DAY DETAILS & NOTES FIXED BOTTOM STYLE WITHIN SCROLL */}
+           <div className="pt-12 border-t-2 border-slate-50 space-y-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{format(selectedDate, 'EEEE')}</p>
+                  <h4 className="text-2xl font-black text-slate-900">{format(selectedDate, 'MMMM d, yyyy')}</h4>
+                </div>
+                {BANGLADESH_HOLIDAYS[format(selectedDate, 'yyyy-MM-dd')] && (
+                  <div className="bg-rose-50 text-rose-600 px-4 py-2 rounded-2xl border border-rose-100 flex items-center gap-2">
+                     <Star className="w-4 h-4 fill-rose-600" />
+                     <span className="text-[10px] font-black uppercase tracking-widest">Public Holiday</span>
+                  </div>
+                )}
+              </div>
+
+              {BANGLADESH_HOLIDAYS[format(selectedDate, 'yyyy-MM-dd')] && (
+                <div className="bg-rose-50/50 p-6 rounded-[2.5rem] border-2 border-rose-100 flex gap-4 items-center">
+                   <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-rose-200">
+                      <AlertCircle className="w-6 h-6 text-white" />
+                   </div>
+                   <div>
+                      <h5 className="font-black text-rose-900 leading-tight mb-1">
+                         {BANGLADESH_HOLIDAYS[format(selectedDate, 'yyyy-MM-dd')]}
+                      </h5>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-rose-400">Bangladesh Govt. Holiday</p>
+                   </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-4 pb-20 lg:pb-0">
+                 <h5 className="text-[10px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                   <Lightbulb className="w-3 h-3 text-[#FACC15]" /> Today's Notes
+                 </h5>
+                 <textarea 
+                   value={dayNotes[format(selectedDate, 'yyyy-MM-dd')] || ''}
+                   onChange={(e) => setDayNotes({...dayNotes, [format(selectedDate, 'yyyy-MM-dd')]: e.target.value})}
+                   placeholder={`What's happening on ${format(selectedDate, 'MMMM d')}? Write something about the day...`}
+                   className="w-full min-h-[200px] bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] p-8 text-sm font-bold text-slate-600 placeholder:text-slate-300 focus:border-[#FACC15] outline-none transition-all resize-none shadow-inner"
+                 />
+              </div>
+           </div>
         </div>
       </aside>
 
@@ -728,36 +886,44 @@ export default function App() {
            )}
          >
             <CalendarIcon className="w-5 h-5" />
-            <span className="text-[8px] font-black uppercase tracking-widest">Next</span>
+            <span className="text-[8px] font-black uppercase tracking-widest">Upcoming</span>
          </button>
 
          <button 
-           onClick={() => setMobileTab('stats')}
+           onClick={() => setMobileTab('calendar')}
            className={cn(
              "px-3 py-4 rounded-3xl flex flex-col items-center gap-1 transition-all",
-             mobileTab === 'stats' ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200" : "text-slate-300"
+             mobileTab === 'calendar' ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200" : "text-slate-300"
            )}
          >
-            <Layers className="w-5 h-5" />
-            <span className="text-[8px] font-black uppercase tracking-widest">Growth</span>
+            <CalendarIcon className="w-5 h-5" />
+            <span className="text-[8px] font-black uppercase tracking-widest">Dates</span>
          </button>
       </footer>
     </div>
   );
 }
 
+// --- Constants ---
+
+const BANGLADESH_HOLIDAYS: {[key: string]: string} = {
+  '2026-02-21': 'Shaheed Day & International Mother Language Day',
+  '2026-03-17': "Sheikh Mujibur Rahman's Birthday",
+  '2026-03-20': 'Eid-ul-Fitr (Estimated)',
+  '2026-03-21': 'Eid-ul-Fitr Holiday (Estimated)',
+  '2026-03-22': 'Eid-ul-Fitr Holiday (Estimated)',
+  '2026-03-26': 'Independence Day',
+  '2026-04-14': 'Pahela Baishakh (Bengali New Year)',
+  '2026-05-01': 'May Day / Buddha Purnima',
+  '2026-05-27': 'Eid-ul-Adha (Estimated)',
+  '2026-05-28': 'Eid-ul-Adha Holiday (Estimated)',
+  '2026-05-29': 'Eid-ul-Adha Holiday (Estimated)',
+  '2026-07-26': 'Ashura (Estimated)',
+  '2026-10-20': 'Durga Puja (Dashami)',
+  '2026-12-16': 'Victory Day',
+  '2026-12-25': 'Christmas Day'
+};
+
 // --- Utils ---
 
-function percentageBadge(p: number) {
-  if (p === 100) return "GOD";
-  if (p > 80) return "PRO";
-  if (p > 50) return "MED";
-  return "STT";
-}
-
-function getInsight(p: number) {
-  if (p === 100) return "Absolute perfection. Your day is fully conquered.";
-  if (p > 80) return "You're in the flow. Keep this momentum going.";
-  if (p > 40) return "Focus on the next smallest step to build power.";
-  return "Success is the sum of small efforts repeated day in and day out.";
-}
+// No utils currently needed.
