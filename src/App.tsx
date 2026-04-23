@@ -106,6 +106,7 @@ export default function App() {
   });
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState<Date>(startOfMonth(new Date(2026, 3, 1))); // Default to April 2026 as per system time
 
   const [activeReminders, setActiveReminders] = useState<Task[]>([]);
 
@@ -226,6 +227,7 @@ export default function App() {
   const goToToday = () => {
     const today = startOfToday();
     setSelectedDate(today);
+    setViewMonth(startOfMonth(today));
     const todayElement = document.getElementById('today-selector');
     if (todayElement && dateSliderRef.current) {
       todayElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -726,29 +728,48 @@ export default function App() {
         "lg:flex w-full lg:w-[450px] bg-white flex-col border-l lg:border-slate-50 overflow-hidden shrink-0",
         mobileTab !== 'calendar' && "hidden lg:flex"
       )}>
-        <div className="p-8 md:p-10 pb-0 w-full flex items-center justify-between">
-          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-             <CalendarIcon className="w-8 h-8 text-[#6366F1]" />
-             Calendar
-          </h2>
-          <button 
-            onClick={goToToday}
-            className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#6366F1] hover:bg-[#6366F1] hover:text-white shadow-sm transition-all shadow-inner"
-          >
-            Today
-          </button>
+        <div className="p-8 md:p-10 pb-0 w-full flex flex-col gap-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+               <CalendarIcon className="w-8 h-8 text-[#6366F1]" />
+               Calendar
+            </h2>
+            <button 
+              onClick={goToToday}
+              className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#6366F1] hover:bg-[#6366F1] hover:text-white shadow-sm transition-all shadow-inner"
+            >
+              Today
+            </button>
+          </div>
+
+          {/* MONTH SELECTOR */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+            {eachMonthOfInterval({
+              start: startOfYear(new Date(2026, 0, 1)),
+              end: endOfYear(new Date(2026, 0, 1))
+            }).map((m) => {
+              const isCurrent = isSameDay(startOfMonth(m), viewMonth);
+              return (
+                <button
+                  key={m.toISOString()}
+                  onClick={() => setViewMonth(startOfMonth(m))}
+                  className={cn(
+                    "shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                    isCurrent ? "bg-[#6366F1] text-white shadow-lg shadow-indigo-100" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                  )}
+                >
+                  {format(m, 'MMM')}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* SCROLLABLE CALENDAR LIST */}
+        {/* CALENDAR CONTENT */}
         <div className="flex-1 overflow-y-auto p-8 md:p-10 pt-6 space-y-12 scroll-smooth no-scrollbar">
-           {eachMonthOfInterval({
-             start: startOfYear(new Date(2026, 0, 1)),
-             end: endOfYear(new Date(2026, 0, 1))
-           }).map((month) => (
-             <div key={month.toISOString()} className="space-y-6">
+             <div className="space-y-6">
                 <h3 className="font-black text-[#6366F1] uppercase tracking-widest text-sm px-2 flex justify-between items-center">
-                  {format(month, 'MMMM yyyy')}
-                  <span className="text-[10px] text-slate-300 font-bold">{format(month, 'MMM')}</span>
+                  {format(viewMonth, 'MMMM yyyy')}
                 </h3>
 
                 <div className="grid grid-cols-7 gap-2">
@@ -757,13 +778,13 @@ export default function App() {
                    ))}
                    
                    {/* Spacing for start of month */}
-                   {Array.from({length: parseInt(format(startOfMonth(month), 'i')) % 7}).map((_, i) => (
+                   {Array.from({length: parseInt(format(startOfMonth(viewMonth), 'i')) % 7}).map((_, i) => (
                      <div key={`empty-${i}`} />
                    ))}
 
                    {eachDayOfInterval({
-                     start: startOfMonth(month),
-                     end: endOfMonth(month)
+                     start: startOfMonth(viewMonth),
+                     end: endOfMonth(viewMonth)
                    }).map((day) => {
                       const dateKey = format(day, 'yyyy-MM-dd');
                       const isSelected = isSameDay(day, selectedDate);
@@ -773,7 +794,10 @@ export default function App() {
                       return (
                         <button 
                           key={day.toISOString()}
-                          onClick={() => setSelectedDate(day)}
+                          onClick={() => {
+                            setSelectedDate(day);
+                            setViewMonth(startOfMonth(day));
+                          }}
                           className={cn(
                             "aspect-square rounded-2xl flex flex-col items-center justify-center relative transition-all group",
                             isSelected ? "bg-[#6366F1] text-white shadow-lg shadow-indigo-200 scale-110 z-10" : "bg-slate-50/50 border border-transparent hover:border-indigo-100 hover:bg-indigo-50/30",
@@ -799,7 +823,6 @@ export default function App() {
                    })}
                 </div>
              </div>
-           ))}
 
            {/* DAY DETAILS & NOTES FIXED BOTTOM STYLE WITHIN SCROLL */}
            <div className="pt-12 border-t-2 border-slate-50 space-y-6">
