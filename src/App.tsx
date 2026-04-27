@@ -16,7 +16,10 @@ import {
   X,
   ArrowUpDown,
   SortAsc,
-  SortDesc
+  SortDesc,
+  MoreVertical,
+  Briefcase,
+  Archive
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -42,6 +45,14 @@ import { cn } from './lib/utils';
 type Priority = 'low' | 'medium' | 'high';
 type SortField = 'priority' | 'dueDate' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
+type RosterRole = 'Cashier' | 'Packer' | 'Other' | 'None';
+
+interface RosterAssignment {
+  id: string;
+  staffName: string;
+  role: RosterRole;
+  dutyTime: string;
+}
 
 interface SortConfig {
   field: SortField;
@@ -104,6 +115,52 @@ export default function App() {
     return {};
   });
 
+  const [dailyRosters, setDailyRosters] = useState<{[key: string]: RosterAssignment[]}>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dt_rosters_v3');
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
+  });
+
+  const [staffMembers, setStaffMembers] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dt_staff');
+      return saved ? JSON.parse(saved) : ["Maheen", "HLASINGNUE", "ABDULLAH", "ISTIAK", "RIDAY", "RAMIM", "MUNAEEM", "MISHKAT"];
+    }
+    return ["Maheen", "HLASINGNUE", "ABDULLAH", "ISTIAK", "RIDAY", "RAMIM", "MUNAEEM", "MISHKAT"];
+  });
+
+  const packerStaff = ["SHAHIN", "NABED", "JUMMAN", "RONJON", "RASHED", "FAISAL", "MAMUN", ""];
+
+  const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
+  const [activeRosterRole, setActiveRosterRole] = useState<RosterRole | null>(null);
+
+  const dutyTimes = ["7-3", "7-7", "8-8", "10-6", "10-10", "12-8", "2-10", "OFF", "CUSTOM"];
+
+  const handleUpdateAssignment = (index: number, field: keyof RosterAssignment, value: string) => {
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const currentAssignments = dailyRosters[dateKey] || [];
+    const updated = [...currentAssignments];
+    
+    if (index >= updated.length) {
+      // Add new assignment if it doesn't exist
+      const newAsgn: RosterAssignment = {
+        id: Math.random().toString(36).substr(2, 9),
+        staffName: field === 'staffName' ? value : '',
+        role: activeRosterRole || 'Other',
+        dutyTime: field === 'dutyTime' ? value : 'OFF'
+      };
+      updated.push(newAsgn);
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
+
+    const finalRosters = { ...dailyRosters, [dateKey]: updated };
+    setDailyRosters(finalRosters);
+    localStorage.setItem('dt_rosters_v3', JSON.stringify(finalRosters));
+  };
+
   const [newTask, setNewTask] = useState<{
     title: string;
     description: string;
@@ -117,6 +174,7 @@ export default function App() {
   });
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isLogoMenuOpen, setIsLogoMenuOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState<Date>(startOfMonth(new Date(2026, 3, 1))); // Default to April 2026 as per system time
 
   const [activeReminders, setActiveReminders] = useState<Task[]>([]);
@@ -305,12 +363,42 @@ export default function App() {
       </div>
 
       {/* MOBILE HEADER */}
-      <header className="lg:hidden bg-[#6366F1] text-white p-4 flex items-center justify-between shadow-lg z-20 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#FACC15] rounded-xl flex items-center justify-center">
-            <CheckCircle className="h-5 w-5 text-[#6366F1]" />
-          </div>
-          <h1 className="text-xl font-black tracking-tighter italic">DT.</h1>
+      <header className="lg:hidden bg-[#6366F1] text-white p-4 flex items-center justify-between shadow-lg z-30 shrink-0">
+        <div className="flex items-center gap-2 relative">
+          <button 
+            onClick={() => setIsLogoMenuOpen(!isLogoMenuOpen)}
+            className="flex items-center gap-2 group"
+          >
+            <div className="w-8 h-8 bg-[#FACC15] rounded-xl flex items-center justify-center">
+              <CheckCircle className="h-5 w-5 text-[#6366F1]" />
+            </div>
+            <h1 className="text-xl font-black tracking-tighter italic">DT.</h1>
+            <MoreVertical className="w-4 h-4 text-white/60 group-hover:text-white transition-colors" />
+          </button>
+
+          <AnimatePresence>
+            {isLogoMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, x: -10, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -10, scale: 0.95 }}
+                className="absolute top-full left-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl p-2 z-50 border border-slate-100"
+              >
+                <button 
+                  onClick={() => {
+                    setIsLogoMenuOpen(false);
+                    setIsRosterModalOpen(true);
+                  }}
+                  className="w-full text-left px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-[#6366F1] hover:text-white transition-all"
+                >
+                  Roaster Daily
+                </button>
+                <button className="w-full text-left px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-[#6366F1] hover:text-white transition-all">
+                  Roaster Monthly
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -351,11 +439,43 @@ export default function App() {
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden lg:flex w-72 bg-[#6366F1] p-8 flex-col text-white shrink-0">
-        <div className="flex items-center gap-3 mb-12">
-          <div className="w-10 h-10 bg-[#FACC15] rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/20">
-            <CheckCircle className="h-6 w-6 text-[#6366F1]" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tighter italic">DT.</h1>
+        <div className="flex items-center gap-3 mb-12 relative">
+          <button 
+            onClick={() => setIsLogoMenuOpen(!isLogoMenuOpen)}
+            className="flex items-center gap-3 group"
+          >
+            <div className="w-10 h-10 bg-[#FACC15] rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/20">
+              <CheckCircle className="h-6 w-6 text-[#6366F1]" />
+            </div>
+            <h1 className="text-2xl font-black tracking-tighter italic">DT.</h1>
+            <MoreVertical className="w-5 h-5 text-white/40 group-hover:text-white transition-colors" />
+          </button>
+
+          <AnimatePresence>
+            {isLogoMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -20, scale: 0.95 }}
+                className="absolute top-full left-0 mt-4 w-56 bg-white rounded-[2rem] shadow-2xl p-3 z-50 border border-slate-100"
+              >
+                <button 
+                  onClick={() => {
+                    setIsLogoMenuOpen(false);
+                    setIsRosterModalOpen(true);
+                  }}
+                  className="w-full text-left px-5 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-[#6366F1] hover:text-white transition-all flex items-center justify-between group"
+                >
+                  Roaster Daily
+                  <div className="w-2 h-2 bg-[#FACC15] rounded-full opacity-0 group-hover:opacity-100" />
+                </button>
+                <button className="w-full text-left px-5 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-[#6366F1] hover:text-white transition-all flex items-center justify-between group">
+                  Roaster Monthly
+                  <div className="w-2 h-2 bg-[#FACC15] rounded-full opacity-0 group-hover:opacity-100" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="flex-1 space-y-8">
@@ -445,6 +565,27 @@ export default function App() {
                       <span className="ml-2 px-3 py-1 bg-rose-50 border border-rose-100 rounded-xl text-[8px] font-black uppercase tracking-widest text-rose-600 animate-pulse">
                          Public Holiday
                       </span>
+                    )}
+                    {dailyRosters[format(selectedDate, 'yyyy-MM-dd')] && (dailyRosters[format(selectedDate, 'yyyy-MM-dd')] || []).length > 0 && (
+                      <button 
+                        onClick={() => setIsRosterModalOpen(true)}
+                        className="ml-2 px-3 py-1 bg-[#6366F1]/5 border border-[#6366F1]/10 rounded-xl text-[8px] font-black uppercase tracking-widest text-[#6366F1] hover:bg-indigo-100 transition-all flex items-center gap-1.5 shadow-sm"
+                      >
+                         <div className="flex -space-x-1">
+                            {(dailyRosters[format(selectedDate, 'yyyy-MM-dd')] || []).slice(0, 2).map((a, i) => (
+                               <div key={a.id} className={cn("w-1.5 h-1.5 rounded-full border border-white", a.role === 'Cashier' ? "bg-emerald-500" : "bg-blue-500")} />
+                            ))}
+                         </div>
+                         Roster: {(dailyRosters[format(selectedDate, 'yyyy-MM-dd')] || []).length} assigned
+                      </button>
+                    )}
+                    {(!dailyRosters[format(selectedDate, 'yyyy-MM-dd')] || (dailyRosters[format(selectedDate, 'yyyy-MM-dd')] || []).length === 0) && (
+                      <button 
+                        onClick={() => setIsRosterModalOpen(true)}
+                        className="ml-2 px-3 py-1 bg-slate-50 border border-slate-100 rounded-xl text-[8px] font-black uppercase tracking-widest text-slate-400 hover:text-[#6366F1] hover:border-indigo-100 transition-all border-dashed"
+                      >
+                        + Add Roster
+                      </button>
                     )}
                   </>
                 )}
@@ -610,6 +751,181 @@ export default function App() {
             </div>
           )}
           <AnimatePresence>
+            {isRosterModalOpen && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 md:p-6"
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                  className="bg-white w-full max-w-2xl rounded-[3rem] p-6 md:p-10 shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]"
+                >
+                  <div className="absolute top-0 right-0 p-6 z-10">
+                     <button onClick={() => {
+                        setIsRosterModalOpen(false);
+                        setActiveRosterRole(null);
+                     }} className="p-3 hover:bg-slate-50 rounded-2xl transition-all">
+                        <X className="w-6 h-6 text-slate-400" />
+                     </button>
+                  </div>
+
+                  {!activeRosterRole ? (
+                    <div className="space-y-8 py-4">
+                       <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 bg-[#6366F1] rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-200">
+                             <CalendarIcon className="w-8 h-8 text-white" />
+                          </div>
+                          <div>
+                             <h2 className="text-3xl font-black text-slate-900 tracking-tighter italic uppercase">Daily Roster</h2>
+                             <p className="text-[10px] uppercase font-black tracking-widest text-[#6366F1]">Select role to manage schedule</p>
+                          </div>
+                       </div>
+                       
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {(['Cashier', 'Packer', 'Other'] as RosterRole[]).map(role => (
+                             <button
+                                key={role}
+                                onClick={() => setActiveRosterRole(role)}
+                                className="p-8 bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 hover:border-[#6366F1] hover:bg-white transition-all flex flex-col items-center gap-4 group"
+                             >
+                                <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-[#6366F1] group-hover:text-white transition-all text-slate-400">
+                                   {role === 'Cashier' ? <Briefcase className="w-7 h-7" /> : role === 'Packer' ? <Archive className="w-7 h-7" /> : <MoreVertical className="w-7 h-7" />}
+                                </div>
+                                <span className="font-black text-slate-900 uppercase tracking-widest text-sm">{role}</span>
+                             </button>
+                          ))}
+                       </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col min-h-0">
+                       <div className="mb-6 flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                             <button onClick={() => setActiveRosterRole(null)} className="p-2 hover:bg-slate-50 rounded-xl">
+                                <ChevronLeft className="w-5 h-5 text-slate-400" />
+                             </button>
+                             <div>
+                                <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">{activeRosterRole} SCHEDULE</h2>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{format(selectedDate, 'EEEE, d MMMM yyyy')}</p>
+                             </div>
+                          </div>
+                       </div>
+
+                       {/* TABLE VIEW */}
+                       <div className={cn(
+                         "flex-1 overflow-y-auto no-scrollbar border-[1.5px] md:border-2 border-slate-900 rounded-xl overflow-hidden",
+                         activeRosterRole === 'Packer' ? "bg-[#FFFF00] p-2 md:p-3" : "bg-white"
+                       )}>
+                          <div className={cn(
+                            "w-full h-full",
+                            activeRosterRole === 'Packer' && "border-[1.5px] md:border-2 border-green-800 bg-white"
+                          )}>
+                            <table className="w-full border-collapse">
+                               <thead>
+                                  <tr className="bg-white border-b-[1.5px] md:border-b-2 border-slate-900">
+                                     <th className="p-3 md:p-4 text-left text-[10px] md:text-xs font-black uppercase tracking-widest border-r-[1.5px] md:border-r-2 border-slate-900 w-1/2">Name</th>
+                                     <th className="p-3 md:p-4 text-left text-[10px] md:text-xs font-black uppercase tracking-widest">Duty Time</th>
+                                  </tr>
+                               </thead>
+                               <tbody>
+                                  {Array.from({ length: 8 }).map((_, idx) => {
+                                     const dateKey = format(selectedDate, 'yyyy-MM-dd');
+                                     const currentAssignments = dailyRosters[dateKey] || [];
+                                     const roleAssignments = currentAssignments.filter(a => a.role === activeRosterRole);
+                                     const assignment = roleAssignments[idx];
+                                     
+                                     const defaultPlaceholder = activeRosterRole === 'Packer' 
+                                      ? (idx < packerStaff.length ? packerStaff[idx] : "")
+                                      : (idx < staffMembers.length ? staffMembers[idx] : "");
+
+                                     return (
+                                        <tr key={idx} className="border-b-[1.5px] md:border-b-2 border-slate-900 last:border-b-0 hover:bg-slate-50 transition-colors">
+                                           <td className={cn(
+                                             "p-0 border-r-[1.5px] md:border-r-2 border-slate-900",
+                                             activeRosterRole === 'Packer' && "bg-gray-300"
+                                           )}>
+                                              <input 
+                                                type="text" 
+                                                placeholder={defaultPlaceholder || "Enter..."}
+                                                value={assignment?.staffName || ""}
+                                                onChange={(e) => {
+                                                  const updatedAll = [...currentAssignments];
+                                                  const existingIdxInTotal = updatedAll.indexOf(assignment!);
+                                                  
+                                                  if (existingIdxInTotal === -1) {
+                                                     updatedAll.push({
+                                                        id: Math.random().toString(36).substr(2, 9),
+                                                        staffName: e.target.value,
+                                                        role: activeRosterRole!,
+                                                        dutyTime: "OFF"
+                                                     });
+                                                  } else {
+                                                     updatedAll[existingIdxInTotal].staffName = e.target.value;
+                                                  }
+                                                  setDailyRosters({ ...dailyRosters, [dateKey]: updatedAll });
+                                                  localStorage.setItem('dt_rosters_v3', JSON.stringify({ ...dailyRosters, [dateKey]: updatedAll }));
+                                                }}
+                                                className="w-full p-3 md:p-4 text-xs md:text-sm font-black text-slate-900 bg-transparent outline-none uppercase placeholder:text-slate-500"
+                                              />
+                                           </td>
+                                           <td className={cn(
+                                             "p-0",
+                                             activeRosterRole === 'Packer' ? "bg-gray-300" : "bg-slate-200"
+                                           )}>
+                                              <select 
+                                                value={assignment?.dutyTime || "OFF"}
+                                                onChange={(e) => {
+                                                  const updatedAll = [...currentAssignments];
+                                                  const existingIdxInTotal = updatedAll.indexOf(assignment!);
+                                                  
+                                                  if (existingIdxInTotal === -1) {
+                                                     updatedAll.push({
+                                                        id: Math.random().toString(36).substr(2, 9),
+                                                        staffName: assignment?.staffName || (activeRosterRole === 'Packer' ? (packerStaff[idx] || "") : (staffMembers[idx] || "")),
+                                                        role: activeRosterRole!,
+                                                        dutyTime: e.target.value
+                                                     });
+                                                  } else {
+                                                     updatedAll[existingIdxInTotal].dutyTime = e.target.value;
+                                                  }
+                                                  setDailyRosters({ ...dailyRosters, [dateKey]: updatedAll });
+                                                  localStorage.setItem('dt_rosters_v3', JSON.stringify({ ...dailyRosters, [dateKey]: updatedAll }));
+                                                }}
+                                                className="w-full p-3 md:p-4 text-[10px] md:text-xs font-black text-slate-900 bg-transparent outline-none uppercase cursor-pointer"
+                                              >
+                                                 {dutyTimes.map(time => (
+                                                    <option key={time} value={time}>{time}</option>
+                                                 ))}
+                                              </select>
+                                           </td>
+                                        </tr>
+                                     );
+                                  })}
+                               </tbody>
+                            </table>
+                          </div>
+                       </div>
+
+                       <div className="mt-6 md:mt-8 flex gap-4">
+                          <button 
+                             onClick={() => {
+                                setIsRosterModalOpen(false);
+                                setActiveRosterRole(null);
+                             }}
+                             className="flex-1 bg-[#6366F1] text-white py-4 md:py-5 rounded-[1.5rem] md:rounded-[2rem] font-black text-xs md:text-sm uppercase tracking-widest shadow-2xl shadow-indigo-200 active:scale-[0.98] transition-all"
+                          >
+                             Save Schedule
+                          </button>
+                       </div>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+
             {isAddingTask && (
               <motion.div 
                 initial={{ opacity: 0, y: 100 }}
@@ -929,6 +1245,14 @@ export default function App() {
                            </span>
                            {holiday && (
                              <div className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 border-2 border-white rounded-full shadow-sm" />
+                           )}
+                           {dailyRosters[dateKey] && (dailyRosters[dateKey] || []).length > 0 && (
+                             <div className="absolute top-1 left-1 flex items-center justify-center">
+                                <div className={cn(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  (dailyRosters[dateKey] || []).some(a => a.role === 'Cashier') ? "bg-emerald-500" : "bg-blue-500"
+                                )} />
+                             </div>
                            )}
                            {dayNotes[dateKey] && !isSelected && (
                              <div className="absolute -bottom-1 w-1.5 h-1.5 bg-[#FACC15] rounded-full" />
