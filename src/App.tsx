@@ -51,7 +51,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 // --- Types ---
 
 type Priority = 'low' | 'medium' | 'high';
-type SortField = 'priority' | 'dueDate' | 'createdAt';
+type SortField = 'priority' | 'dueDate' | 'createdAt' | 'title';
 type SortDirection = 'asc' | 'desc';
 type RosterRole = 'Cashier' | 'Packer' | 'Other' | 'None';
 
@@ -392,6 +392,8 @@ export default function App() {
           const dateA = new Date(a.createdAt).getTime();
           const dateB = new Date(b.createdAt).getTime();
           if (dateA !== dateB) return (dateA - dateB) * direction;
+        } else if (sortConfig.field === 'title') {
+          if (a.title !== b.title) return a.title.localeCompare(b.title) * direction;
         }
 
         // Fallback to secondary sorts for stability
@@ -742,7 +744,7 @@ export default function App() {
             </div>
             
             <div className="flex bg-white p-1 rounded-xl border border-slate-100 shadow-sm">
-              {(['priority', 'dueDate', 'createdAt'] as SortField[]).map((field) => (
+              {(['priority', 'dueDate', 'createdAt', 'title'] as SortField[]).map((field) => (
                 <button
                   key={field}
                   onClick={() => setSortConfig(prev => ({ 
@@ -754,7 +756,7 @@ export default function App() {
                     sortConfig.field === field ? "bg-[#6366F1] text-white shadow-sm" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
                   )}
                 >
-                  {field === 'priority' ? 'Priority' : field === 'dueDate' ? 'Date' : 'Created'}
+                  {field === 'priority' ? 'Priority' : field === 'dueDate' ? 'Date' : field === 'createdAt' ? 'Created' : 'Title'}
                 </button>
               ))}
             </div>
