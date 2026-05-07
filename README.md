@@ -1,20 +1,45 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# DT - Duty Roster & Task Manager
 
-# Run and deploy your AI Studio app
+A streamlined, AI-powered duty roster and task management application.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/1fdd82cc-98a1-4b14-8a19-5ef9a47ea05f
+- **Daily & Monthly Roster**: Manage shifts for Cashiers, Packers, and more.
+- **AI Roster Analysis**: Upload a photo of a printed roster, and Gemini AI will automatically parse and populate the digital roster.
+- **Task Management**: Organize tasks with priorities, due dates, and reminders.
+- **Sorting**: Multi-field sorting (Priority, Date, Title, Created).
+- **Holiday Awareness**: Automatic detection and display of official holidays in Bangladesh.
 
-## Run Locally
+## Deployment
 
-**Prerequisites:**  Node.js
+### Netlify
 
+This app is ready to be deployed to Netlify.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Connect your GitHub repository to Netlify.
+2. Set the build command to `npm run build`.
+3. Set the publish directory to `dist`.
+4. **Important**: Add an environment variable `GEMINI_API_KEY` with your Google Gemini API key.
+
+## Local Development
+
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Create a `.env` file based on `.env.example` and add your `GEMINI_API_KEY`.
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+## Technologies Used
+
+- React 19
+- Vite
+- Tailwind CSS
+- Google Gemini API (via `@google/genai`)
+- Lucide React
+- Date-fns
+- Motion

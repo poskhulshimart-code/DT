@@ -46,7 +46,17 @@ import {
 } from 'date-fns';
 import { cn } from './lib/utils';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const getApiKey = () => {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key || key === "undefined") {
+    // We don't throw here to prevent the app from crashing on start 
+    // if the user hasn't set the key yet on Netlify/GitHub.
+    return "ALREADY_SET_OR_MISSING"; 
+  }
+  return key;
+};
+
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 // --- Types ---
 
@@ -249,6 +259,8 @@ export default function App() {
       setIsAnalyzing(false);
     }
   };
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [selectedHolidayInfo, setSelectedHolidayInfo] = useState<{name: string, date: string} | null>(null);
   const [activeRosterRole, setActiveRosterRole] = useState<RosterRole | null>(null);
 
   const dutyTimes = ["7-3", "7-7", "8-8", "10-6", "10-10", "12-8", "2-10", "OFF", "Leave", "CUSTOM"];
@@ -822,21 +834,33 @@ export default function App() {
                     <button
                       key={date.toISOString()}
                       id={isTdy ? 'today-selector' : undefined}
-                      onClick={() => setSelectedDate(date)}
+                      onClick={() => {
+                        setSelectedDate(date);
+                        const holiday = BANGLADESH_HOLIDAYS[dateStr];
+                        if (holiday) {
+                          setSelectedHolidayInfo({ name: holiday, date: dateStr });
+                          setIsHolidayModalOpen(true);
+                        }
+                      }}
                       className={cn(
                         "shrink-0 w-16 h-20 md:w-20 md:h-24 rounded-3xl flex flex-col items-center justify-center transition-all duration-300 relative border-2",
                         isSelected 
                           ? "bg-[#6366F1] text-white shadow-xl shadow-indigo-200 scale-110 z-10 border-[#6366F1]" 
                           : cn(
                               "bg-white shadow-sm",
-                              hasIncomplete 
-                                ? "border-rose-500/50 text-rose-400 hover:bg-rose-50/30" 
-                                : isFullyDone
-                                  ? "border-emerald-500/50 text-emerald-400 hover:bg-emerald-50/30"
-                                  : "border-transparent text-slate-400 hover:bg-slate-50"
+                              BANGLADESH_HOLIDAYS[dateStr]
+                                ? "border-rose-500 text-rose-500 hover:bg-rose-50"
+                                : hasIncomplete 
+                                  ? "border-rose-500/50 text-rose-400 hover:bg-rose-50/30" 
+                                  : isFullyDone
+                                    ? "border-emerald-500/50 text-emerald-400 hover:bg-emerald-50/30"
+                                    : "border-transparent text-slate-400 hover:bg-slate-50"
                             )
                       )}
                     >
+                      {BANGLADESH_HOLIDAYS[dateStr] && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 border-2 border-white rounded-full z-20" />
+                      )}
                       <span className={cn(
                         "text-[10px] font-black uppercase tracking-widest mb-1", 
                         isSelected 
@@ -880,6 +904,66 @@ export default function App() {
             </div>
           )}
           <AnimatePresence>
+            {isHolidayModalOpen && selectedHolidayInfo && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 md:p-6"
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                  className="bg-white w-full max-w-lg rounded-[3rem] p-8 md:p-12 shadow-2xl relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 p-6 md:p-8">
+                     <button onClick={() => setIsHolidayModalOpen(false)} className="p-3 hover:bg-slate-50 rounded-2xl transition-all">
+                        <X className="w-6 h-6 text-slate-400" />
+                     </button>
+                  </div>
+
+                  <div className="mb-10 text-center">
+                     <div className="w-20 h-20 bg-rose-500 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-rose-200 animate-pulse">
+                        <Star className="w-10 h-10 text-white fill-white" />
+                     </div>
+                     <span className="text-[10px] font-black uppercase text-rose-500 tracking-[0.2em] mb-2 block">Official Public Holiday</span>
+                     <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-tight px-4">{selectedHolidayInfo.name}</h2>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="bg-slate-50 rounded-[2rem] p-8 border-2 border-slate-100 flex items-center gap-6">
+                      <div className="w-16 h-16 bg-white rounded-2xl flex flex-col items-center justify-center shrink-0 shadow-sm border border-slate-100">
+                        <span className="text-[10px] font-black text-rose-500 uppercase">{format(new Date(selectedHolidayInfo.date), 'MMM')}</span>
+                        <span className="text-2xl font-black text-slate-900 leading-none">{format(new Date(selectedHolidayInfo.date), 'd')}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-600 leading-relaxed italic">
+                          This is a significant national holiday in Bangladesh. Most government offices and organizations remain closed to observe the occasion.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-emerald-50 rounded-[2rem] p-6 border-2 border-emerald-100 flex gap-4 items-center">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <p className="text-[10px] font-black text-emerald-900 uppercase tracking-widest">Marked as non-working day</p>
+                    </div>
+
+                    <button 
+                      onClick={() => setIsHolidayModalOpen(false)}
+                      className="w-full bg-[#6366F1] text-white py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-indigo-100 active:scale-[0.98] transition-all"
+                    >
+                      Close Details
+                    </button>
+                  </div>
+
+                  <div className="absolute bottom-0 left-0 right-0 h-2 bg-rose-500" />
+                </motion.div>
+              </motion.div>
+            )}
+
             {isMonthlyRosterModalOpen && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1447,6 +1531,10 @@ export default function App() {
                           onClick={() => {
                             setSelectedDate(day);
                             setViewMonth(startOfMonth(day));
+                            if (holiday) {
+                              setSelectedHolidayInfo({ name: holiday, date: dateKey });
+                              setIsHolidayModalOpen(true);
+                            }
                           }}
                           className={cn(
                             "aspect-square rounded-2xl flex flex-col items-center justify-center relative transition-all group",
