@@ -24,7 +24,8 @@ import {
   Loader2,
   FileText,
   Save,
-  Trash
+  Trash,
+  LayoutGrid
 } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
@@ -303,6 +304,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLogoMenuOpen, setIsLogoMenuOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState<Date>(startOfMonth(new Date(2026, 3, 1))); // Default to April 2026 as per system time
+  const [isVerticalCalendar, setIsVerticalCalendar] = useState(true); // Default to true as per user request
 
   const [activeReminders, setActiveReminders] = useState<Task[]>([]);
 
@@ -1432,10 +1434,22 @@ export default function App() {
         mobileTab !== 'calendar' && "hidden lg:flex"
       )}>
         <div className="p-8 md:p-10 pb-0 w-full flex items-center justify-between shrink-0">
-          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-             <CalendarIcon className="w-8 h-8 text-[#6366F1]" />
-             Calendar
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+               <CalendarIcon className="w-8 h-8 text-[#6366F1]" />
+               Calendar
+            </h2>
+            <button 
+              onClick={() => setIsVerticalCalendar(!isVerticalCalendar)}
+              className={cn(
+                "p-2 rounded-xl transition-all",
+                isVerticalCalendar ? "bg-[#6366F1] text-white shadow-lg" : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+              )}
+              title={isVerticalCalendar ? "Switch to Grid View" : "Switch to Vertical Scroll"}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
           <button 
             onClick={goToToday}
             className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#6366F1] hover:bg-[#6366F1] hover:text-white shadow-sm transition-all shadow-inner"
@@ -1445,65 +1459,74 @@ export default function App() {
         </div>
 
         {/* CALENDAR SCROLL AREA */}
-        <div className="flex-1 overflow-y-auto p-8 md:p-10 pt-6 space-y-12 scroll-smooth min-h-0">
-          {/* MONTH SELECTOR - Now inside scroll area */}
-          <div className="relative group mb-4">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                if (monthSliderRef.current) {
-                  monthSliderRef.current.scrollBy({ left: -200, behavior: 'smooth' });
-                }
-              }}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-8 h-8 bg-white shadow-lg rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 border border-slate-100"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
+        <div className="flex-1 overflow-y-auto p-8 md:p-10 pt-6 space-y-12 scroll-smooth min-h-0 no-scrollbar">
+          {!isVerticalCalendar && (
+            <div className="relative group mb-4">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (monthSliderRef.current) {
+                    monthSliderRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+                  }
+                }}
+                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-8 h-8 bg-white shadow-lg rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 border border-slate-100"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
 
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                if (monthSliderRef.current) {
-                  monthSliderRef.current.scrollBy({ left: 200, behavior: 'smooth' });
-                }
-              }}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-8 h-8 bg-white shadow-lg rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 border border-slate-100"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (monthSliderRef.current) {
+                    monthSliderRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+                  }
+                }}
+                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-8 h-8 bg-white shadow-lg rounded-full z-20 hidden md:flex items-center justify-center text-slate-400 hover:text-[#6366F1] transition-all opacity-0 group-hover:opacity-100 border border-slate-100"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
 
-            <div 
-              ref={monthSliderRef}
-              className="flex gap-2 overflow-x-auto no-scrollbar pb-6 scroll-smooth"
-              style={{ 
-                maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)'
-              }}
-            >
-              {eachMonthOfInterval({
-                start: startOfYear(new Date(2026, 0, 1)),
-                end: endOfYear(new Date(2026, 0, 1))
-              }).map((m) => {
-                const isCurrent = isSameDay(startOfMonth(m), viewMonth);
-                return (
-                  <button
-                    key={m.toISOString()}
-                    id={isCurrent ? 'active-month-selector' : undefined}
-                    onClick={() => setViewMonth(startOfMonth(m))}
-                    className={cn(
-                      "shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                      isCurrent ? "bg-[#6366F1] text-white shadow-lg shadow-indigo-100" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-                    )}
-                  >
-                    {format(m, 'MMM')}
-                  </button>
-                );
-              })}
+              <div 
+                ref={monthSliderRef}
+                className="flex gap-2 overflow-x-auto no-scrollbar pb-6 scroll-smooth"
+                style={{ 
+                  maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)'
+                }}
+              >
+                {eachMonthOfInterval({
+                  start: startOfYear(new Date(2026, 0, 1)),
+                  end: endOfYear(new Date(2026, 0, 1))
+                }).map((m) => {
+                  const isCurrent = isSameDay(startOfMonth(m), viewMonth);
+                  return (
+                    <button
+                      key={m.toISOString()}
+                      id={isCurrent ? 'active-month-selector' : undefined}
+                      onClick={() => setViewMonth(startOfMonth(m))}
+                      className={cn(
+                        "shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                        isCurrent ? "bg-[#6366F1] text-white shadow-lg shadow-indigo-100" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                      )}
+                    >
+                      {format(m, 'MMM')}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
           
-          <div className="space-y-6">
-                <h3 className="font-black text-[#6366F1] uppercase tracking-widest text-sm px-2 flex justify-between items-center">
-                  {format(viewMonth, 'MMMM yyyy')}
+          <div className="space-y-12">
+            {(isVerticalCalendar 
+              ? eachMonthOfInterval({
+                  start: startOfYear(new Date(2026, 0, 1)),
+                  end: endOfYear(new Date(2026, 0, 1))
+                })
+              : [viewMonth]
+            ).map((month) => (
+              <div key={month.toISOString()} className="space-y-6">
+                <h3 className="font-black text-[#6366F1] uppercase tracking-widest text-sm px-2 flex justify-between items-center bg-white/80 backdrop-blur sticky top-0 py-2 z-[20]">
+                  {format(month, 'MMMM yyyy')}
                 </h3>
 
                 <div className="grid grid-cols-7 gap-2">
@@ -1512,13 +1535,13 @@ export default function App() {
                    ))}
                    
                    {/* Spacing for start of month */}
-                   {Array.from({length: parseInt(format(startOfMonth(viewMonth), 'i')) % 7}).map((_, i) => (
+                   {Array.from({length: parseInt(format(startOfMonth(month), 'i')) % 7}).map((_, i) => (
                      <div key={`empty-${i}`} />
                    ))}
 
                    {eachDayOfInterval({
-                     start: startOfMonth(viewMonth),
-                     end: endOfMonth(viewMonth)
+                     start: startOfMonth(month),
+                     end: endOfMonth(month)
                    }).map((day) => {
                       const dateKey = format(day, 'yyyy-MM-dd');
                       const isSelected = isSameDay(day, selectedDate);
@@ -1530,7 +1553,7 @@ export default function App() {
                           key={day.toISOString()}
                           onClick={() => {
                             setSelectedDate(day);
-                            setViewMonth(startOfMonth(day));
+                            if (!isVerticalCalendar) setViewMonth(startOfMonth(day));
                             if (holiday) {
                               setSelectedHolidayInfo({ name: holiday, date: dateKey });
                               setIsHolidayModalOpen(true);
@@ -1568,7 +1591,9 @@ export default function App() {
                       );
                    })}
                 </div>
-             </div>
+              </div>
+            ))}
+          </div>
 
            {/* DAY DETAILS & NOTES FIXED BOTTOM STYLE WITHIN SCROLL */}
            <div className="pt-12 border-t-2 border-slate-50 space-y-6">
